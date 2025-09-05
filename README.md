@@ -1,2 +1,2 @@
 # Overhead
-Nicer default nameplates for vanilla
+Nicer default nameplates for vanilla. Requires SuperWoW.
