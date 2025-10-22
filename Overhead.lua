@@ -161,11 +161,10 @@ end
 
 local function CreatePlate(parent)
 	local scale = UIParent:GetEffectiveScale()
-	local plateName = "OverheadPlate"..PlateCount
 	local guid = parent:GetName(1)
 	local _, class = UnitClass(guid)
 
-	local nameplate = CreateFrame("Frame", plateName, parent)
+	local nameplate = CreateFrame("Frame", "OverheadPlate"..PlateCount, parent)
 	nameplate:SetWidth(parent:GetWidth())
 	nameplate:SetHeight(parent:GetHeight())
 	nameplate:SetPoint("CENTER", parent, "CENTER", 0, 12)
@@ -194,10 +193,11 @@ local function CreatePlate(parent)
 	parent.levelIcon = levelIcon
 	parent.raidIcon = raidIcon
 
+	parent.name:Hide()
 	parent.healthBar = parent:GetChildren()
 	parent.healthBar:Hide()
 
-	nameplate.healthBar = CreateFrame("StatusBar", plateName.."Health", nameplate)
+	nameplate.healthBar = CreateFrame("StatusBar", "$parentHealth", nameplate)
 	nameplate.healthBar:SetWidth(parent.healthBar:GetWidth())
 	nameplate.healthBar:SetHeight(parent.healthBar:GetHeight())
 	local point, relativeTo, relativePoint, x, y = parent.healthBar:GetPoint()
@@ -231,7 +231,7 @@ local function CreatePlate(parent)
 	ClickAreaWidth = parent.healthBar:GetWidth() + 30
 	ClickAreaHeight = parent.healthBar:GetHeight() + 8
 
-	nameplate.clickArea = CreateFrame("Button", plateName.."ClickArea", nameplate)
+	nameplate.clickArea = CreateFrame("Button", "$parentClickArea", nameplate)
 	nameplate.clickArea:SetPoint("TOPLEFT", nameplate.healthBar, "TOPLEFT", -2, 4)
 	nameplate.clickArea:SetWidth(ClickAreaWidth)
 	nameplate.clickArea:SetHeight(ClickAreaHeight)
@@ -253,10 +253,7 @@ local function CreatePlate(parent)
 	nameplate.clickArea:SetScript("OnEnter", function()
 		nameplate:SetFrameStrata("MEDIUM")
 		nameplate:SetAlpha(1)
-		local r, g, b  = parent.name:GetTextColor()
-		if r > 0.9 and g > 0.9 and b > 0.9 then
-			parent.name:SetTextColor(1, 1, 0)
-		end
+		nameplate.name:SetTextColor(1, 1, 0)
 		-- SetMouseoverUnit(parent:GetName(1))
 		if nameplate.totemIcon:IsShown() then
 			nameplate.totemHighlight:Show()
@@ -275,15 +272,14 @@ local function CreatePlate(parent)
 		else
 			nameplate:SetAlpha(InactiveAlpha)
 		end
-		local r, g, b  = parent.name:GetTextColor()
-		if not (r > 0.9 and g < 0.2 and b < 0.2) then
-			parent.name:SetTextColor(1, 1, 1)
+		if not UnitIsUnit("target", parent.unit or "") then
+			nameplate.name:SetTextColor(1, 1, 1)
 		end
 		nameplate.totemHighlight:Hide()
 		-- SetMouseoverUnit()
 	end)
 
-	nameplate.glow = nameplate.healthBar:CreateTexture(plateName.."Glow", "BACKGROUND")
+	nameplate.glow = nameplate.healthBar:CreateTexture("$parentGlow", "BACKGROUND")
 	nameplate.glow:SetPoint("CENTER", nameplate.healthBar, "CENTER", 10, 0)
 	nameplate.glow:SetTexture("Interface\\AddOns\\Overhead\\Glow")
 	nameplate.glow:SetWidth(nameplate.clickArea:GetWidth() * 2)
@@ -292,7 +288,7 @@ local function CreatePlate(parent)
 	nameplate.glow:SetVertexColor(1, 1, 1, 0.5)
 	nameplate.glow:Hide()
 
-	-- nameplate.background = nameplate.healthBar:CreateTexture(plateName.."Background", "BORDER")
+	-- nameplate.background = nameplate.healthBar:CreateTexture("$parentBackground", "BORDER")
 	-- nameplate.background:SetPoint("CENTER", nameplate.healthBar, "CENTER", 0, 0)
 	-- nameplate.background:SetWidth(nameplate.healthBar:GetWidth())
 	-- nameplate.background:SetHeight(nameplate.healthBar:GetHeight())
@@ -305,7 +301,7 @@ local function CreatePlate(parent)
 	parent.border:SetHeight(nameplate.healthBar:GetHeight() * 2 + 21)
 	parent.border:SetDrawLayer("OVERLAY")
 
-	nameplate.highlight = nameplate.clickArea:CreateTexture(nil, "HIGHLIGHT")
+	nameplate.highlight = nameplate.clickArea:CreateTexture("$parentHighlight", "HIGHLIGHT")
 	nameplate.highlight:SetWidth(parent.border:GetWidth())
 	nameplate.highlight:SetHeight(parent.border:GetHeight())
 	nameplate.highlight:SetPoint(parent.border:GetPoint())
@@ -328,18 +324,20 @@ local function CreatePlate(parent)
 	parent.levelIcon:SetPoint("LEFT", nameplate.healthBar, "RIGHT", 6, 0)
 	parent.levelIcon:SetDrawLayer("OVERLAY")
 
-	parent.name:SetParent(nameplate)
-	parent.name:ClearAllPoints()
-	parent.name:SetPoint("BOTTOM", nameplate.healthBar, "TOP", 8, 8)
-	parent.name:SetDrawLayer("OVERLAY")
+	nameplate.name = nameplate:CreateFontString("$parentName", "OVERLAY", "GameFontHighlightLarge")
+	nameplate.name:SetText(parent.name:GetText())
+	nameplate.name:SetFont(parent.name:GetFont())
+	nameplate.name:SetShadowOffset(1.5, -1.5)
+	nameplate.name:SetJustifyH("CENTER")
+	nameplate.name:SetPoint("BOTTOM", nameplate.healthBar, "TOP", 8, 4)
 
-	nameplate.elite = nameplate:CreateTexture(nil, "OVERLAY")
+	nameplate.elite = nameplate:CreateTexture("$parentElite", "OVERLAY")
 	nameplate.elite:SetTexture("Interface\\AddOns\\Overhead\\Elite")
 	nameplate.elite:SetPoint("LEFT", nameplate.healthBar, "RIGHT", -6, -5)
 	nameplate.elite:SetHeight(42)
 	nameplate.elite:SetWidth(78)
 
-	nameplate.castBar = CreateFrame("StatusBar", plateName.."CastBar", nameplate)
+	nameplate.castBar = CreateFrame("StatusBar", "$parentCastBar", nameplate)
 	nameplate.castBar:SetWidth(nameplate.healthBar:GetWidth() - 23)
 	nameplate.castBar:SetHeight(nameplate.healthBar:GetHeight())
 	nameplate.castBar:SetPoint("TOPLEFT", nameplate.healthBar, "BOTTOMLEFT", 22, -4)
@@ -349,29 +347,29 @@ local function CreatePlate(parent)
 	nameplate.castBar:SetFrameLevel(2)
 	nameplate.castBar:Hide()
 
-	nameplate.castBarText = nameplate.castBar:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+	nameplate.castBarText = nameplate.castBar:CreateFontString("$parentCastBarText", "ARTWORK", "GameFontHighlightSmall")
 	nameplate.castBarText:SetWidth(nameplate.castBar:GetWidth() - 2)
 	nameplate.castBarText:SetHeight(nameplate.castBar:GetHeight())
 	nameplate.castBarText:SetPoint("CENTER", nameplate.castBar, "CENTER", 2, 0)
 
-	nameplate.castBarSpark = nameplate.castBar:CreateTexture(nil, "OVERLAY")
+	nameplate.castBarSpark = nameplate.castBar:CreateTexture("$parentCastBarSpark", "OVERLAY")
 	nameplate.castBarSpark:SetTexture("Interface\\CastingBar\\UI-CastingBar-Spark")
 	nameplate.castBarSpark:SetWidth(32)
 	nameplate.castBarSpark:SetHeight(32)
 	nameplate.castBarSpark:SetBlendMode("ADD")
 
-	nameplate.castBarBorder = nameplate.castBar:CreateTexture(nil, "ARTWORK")
+	nameplate.castBarBorder = nameplate.castBar:CreateTexture("$parentCastBarBorder", "ARTWORK")
 	nameplate.castBarBorder:SetTexture("Interface\\AddOns\\Overhead\\CastBar")
 	nameplate.castBarBorder:SetPoint("CENTER", nameplate.castBar, "CENTER", -9, 0)
 
-	nameplate.castBarIcon = nameplate.castBar:CreateTexture(plateName.."CastBarIconTexture", "OVERLAY")
+	nameplate.castBarIcon = nameplate.castBar:CreateTexture("$parentCastBarIcon", "OVERLAY")
 	nameplate.castBarIcon:SetWidth(13)
 	nameplate.castBarIcon:SetHeight(13)
 	nameplate.castBarIcon:SetPoint("CENTER", nameplate.castBar, "LEFT", -10, 0)
 	nameplate.castBarIcon:SetTexCoord(0.07, 0.9, 0.1, 0.93)
 	nameplate.castBarIcon:SetTexture(0)
 
-	nameplate.totemIcon = nameplate:CreateTexture(nil, "BORDER")
+	nameplate.totemIcon = nameplate:CreateTexture("$parentTotemIcon", "BORDER")
 	nameplate.totemIcon:SetWidth(TotemWidth)
 	nameplate.totemIcon:SetHeight(TotemWidth)
 	nameplate.totemIcon:SetPoint("CENTER", nameplate, "CENTER", 0, 0)
@@ -379,7 +377,7 @@ local function CreatePlate(parent)
 	nameplate.totemIcon:SetTexture("Interface\\Icons\\spell_fire_selfdestruct")
 	nameplate.totemIcon:Hide()
 
-	nameplate.totemGlow = nameplate:CreateTexture(nil, "BACKGROUND")
+	nameplate.totemGlow = nameplate:CreateTexture("$parentTotemGlow", "BACKGROUND")
 	nameplate.totemGlow:SetTexture("Interface\\AddOns\\Overhead\\Glow")
 	nameplate.totemGlow:SetWidth(TotemWidth * 3)
 	nameplate.totemGlow:SetHeight(TotemWidth * 3)
@@ -387,7 +385,7 @@ local function CreatePlate(parent)
 	nameplate.totemGlow:SetVertexColor(1, 1, 1, 0.4)
 	nameplate.totemGlow:Hide()
 
-	nameplate.totemHighlight = nameplate.clickArea:CreateTexture(nil, "HIGHLIGHT")
+	nameplate.totemHighlight = nameplate.clickArea:CreateTexture("$parentTotemHighlight", "HIGHLIGHT")
 	nameplate.totemHighlight:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
 	nameplate.totemHighlight:SetWidth(58)
 	nameplate.totemHighlight:SetHeight(58)
@@ -409,6 +407,7 @@ local function CreatePlate(parent)
 		nameplate.clickArea.unit = unit
 		parent:EnableMouse(false)
 		isMouseOver = GetMouseFocus() == nameplate.clickArea
+		nameplate.name:SetText(parent.name:GetText())
 
 		if creatureType == "Critter" then
 			minimized = true
@@ -416,13 +415,15 @@ local function CreatePlate(parent)
 			nameplate.highlight:Hide()
 			nameplate.totemIcon:Hide()
 			nameplate.clickArea:EnableMouse(false)
-			parent.level:SetPoint("CENTER", parent.name, "RIGHT", 12, 0)
+			nameplate.name:Hide()
+			parent.level:Hide()
+			-- parent.level:SetPoint("CENTER", parent.name, "RIGHT", 12, 0)
 		elseif creatureType == "Totem" then
 			minimized = true
 			nameplate.healthBar:Hide()
 			nameplate.highlight:Hide()
 			parent.level:Hide()
-			parent.name:Hide()
+			nameplate.name:Hide()
 			for k, v in pairs(Totems) do
 				if strfind(UnitName(unit), k) then
 					icon = v
@@ -446,7 +447,7 @@ local function CreatePlate(parent)
 			else
 				parent.level:Hide()
 			end
-			parent.name:Show()
+			nameplate.name:Show()
 			nameplate.clickArea:SetWidth(ClickAreaWidth)
 			nameplate.clickArea:SetHeight(ClickAreaHeight)
 			nameplate.clickArea:SetPoint("TOPLEFT", nameplate.healthBar, "TOPLEFT", -2, 4)
@@ -457,6 +458,7 @@ local function CreatePlate(parent)
 			nameplate:SetFrameStrata("LOW")
 			nameplate.strata = true
 			nameplate.glow:Show()
+			nameplate.name:SetTextColor(1, 1, 0)
 			if nameplate.totemIcon:IsShown() then
 				nameplate.totemGlow:Show()
 			end
@@ -465,9 +467,20 @@ local function CreatePlate(parent)
 			nameplate.strata = false
 			nameplate.glow:Hide()
 			nameplate.totemGlow:Hide()
+			nameplate.name:SetTextColor(1, 1, 1)
 		end
 
-		if isTarget or not UnitExists("target") or creatureType == "Totem" or isMouseOver then
+		if UnitExists("mouseover") and not isTarget and UnitIsUnit(unit, "mouseover") and not nameplate.strata then
+			nameplate:SetFrameStrata("MEDIUM")
+			nameplate.strata = true
+			nameplate.name:SetTextColor(1, 1, 0)
+		elseif not isTarget and nameplate.strata then
+			nameplate:SetFrameStrata("BACKGROUND")
+			nameplate.strata = false
+			nameplate.name:SetTextColor(1, 1, 1)
+		end
+
+		if isTarget or not UnitExists("target") or creatureType == "Totem" or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
 			nameplate:SetAlpha(1)
 		else
 			nameplate:SetAlpha(InactiveAlpha)
@@ -561,6 +574,8 @@ Overhead:SetScript("OnUpdate", function()
 	end
 
 	if not IsMouselooking() and Overhead.time + 0.5 < GetTime() then
+		Overhead.frame = nil
+		Overhead.time = nil
 		return
 	end
 
