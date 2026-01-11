@@ -178,7 +178,7 @@ local function OnMouseDown()
 	if arg1 == "RightButton" then
 		MouselookStart()
 		Overhead.time = GetTime()
-		Overhead.frame = parent
+		Overhead.frame = this:GetParent().parent
 	else
 		this:GetParent().parent:Click()
 		Overhead.frame = nil
