@@ -5,16 +5,16 @@ end
 local Regions
 local Plate
 local Childs
-local ClickAreaWidth
-local ClickAreaHeight
+local CLICK_AREA_WIDTH
+local CLICK_AREA_HEIGHT
 
 local Initialized = 0
 local ParentCount = 0
 local PlateCount = 0
-local ParentWidth = 1
-local ParentHeight = 1
-local InactiveAlpha = 0.6
-local TotemWidth = 32
+local PARENT_WIDTH = 1
+local PARENT_HEIGHT = 1
+local ALPHA_INACTIVE = 0.6
+local TOTEM_WIDTH = 32
 
 local _, PlayerGUID = UnitExists("player")
 
@@ -143,8 +143,8 @@ Overhead:SetScript("OnEvent", function()
 end)
 
 local function OnShow()
-	this:SetHeight(ParentHeight)
-	this:SetWidth(ParentWidth)
+	this:SetHeight(PARENT_HEIGHT)
+	this:SetWidth(PARENT_WIDTH)
 	this.unit = this:GetName(1)
 	this.overhead.clickArea.unit = this.unit
 	if this.unit and UnitIsPlayer(this.unit) then
@@ -157,6 +157,229 @@ end
 local function OnHide()
 	this.unit = nil
 	this.overhead.clickArea.unit = nil
+end
+
+local function OnValueChanged()
+	local parent = this:GetParent()
+	local unit = parent:GetName(1)
+	local nameplate = parent.overhead
+	if unit and UnitIsPlayer(unit) then
+		local _, class = UnitClass(unit)
+		parent.classColor = ClassColors[class]
+		nameplate.healthBar:SetStatusBarColor(parent.classColor.r, parent.classColor.g, parent.classColor.b)
+	else
+		nameplate.healthBar:SetStatusBarColor(parent.healthBar:GetStatusBarColor())
+	end
+	nameplate.healthBar:SetMinMaxValues(parent.healthBar:GetMinMaxValues())
+	nameplate.healthBar:SetValue(parent.healthBar:GetValue())
+end
+
+local function OnMouseDown()
+	if arg1 == "RightButton" then
+		MouselookStart()
+		Overhead.time = GetTime()
+		Overhead.frame = parent
+	else
+		this:GetParent().parent:Click()
+		Overhead.frame = nil
+		Overhead.time = nil
+	end
+end
+
+local function OnEnter()
+	if SpellIsTargeting() then
+		return
+	end
+	local nameplate = this:GetParent()
+	nameplate:SetFrameStrata("MEDIUM")
+	nameplate:SetAlpha(1)
+	nameplate.name:SetTextColor(1, 1, 0)
+	-- SetMouseoverUnit(parent:GetName(1))
+	if nameplate.totemIcon:IsShown() then
+		nameplate.totemHighlight:Show()
+	end
+end
+
+local function OnLeave()
+	if SpellIsTargeting() then
+		return
+	end
+	local nameplate = this:GetParent()
+	local parent = nameplate.parent
+	if not nameplate.strata then
+		nameplate:SetFrameStrata("BACKGROUND")
+		nameplate:SetAlpha(1)
+	elseif nameplate.strata then
+		nameplate:SetFrameStrata("LOW")
+		nameplate:SetAlpha(1)
+	else
+		nameplate:SetAlpha(ALPHA_INACTIVE)
+	end
+	if not UnitIsUnit("target", parent.unit or "") then
+		nameplate.name:SetTextColor(1, 1, 1)
+	end
+	nameplate.totemHighlight:Hide()
+	-- SetMouseoverUnit()
+end
+
+local function OnUpdate()
+	local castInfo, isTarget, unit, creatureType
+	local icon = "spell_fire_selfdestruct"
+	local sparkPosition, barValue = 0, 0
+	local minimized = false
+	local isMouseOver = false
+	local nameplate = this
+	local parent = nameplate.parent
+	isTarget = UnitExists("target") and parent:GetAlpha() == 1
+	unit = parent:GetName(1)
+	creatureType = UnitCreatureType(unit)
+	nameplate.clickArea.unit = unit
+	parent:EnableMouse(false)
+	isMouseOver = GetMouseFocus() == nameplate.clickArea
+	nameplate.name:SetText(parent.name:GetText())
+
+	if creatureType == "Critter" then
+		minimized = true
+		nameplate.healthBar:Hide()
+		nameplate.highlight:Hide()
+		nameplate.totemIcon:Hide()
+		nameplate.clickArea:EnableMouse(false)
+		nameplate.name:Hide()
+		parent.level:Hide()
+		-- parent.level:SetPoint("CENTER", parent.name, "RIGHT", 12, 0)
+	elseif creatureType == "Totem" then
+		minimized = true
+		nameplate.healthBar:Hide()
+		nameplate.highlight:Hide()
+		parent.level:Hide()
+		nameplate.name:Hide()
+		for k, v in pairs(Totems) do
+			if strfind(UnitName(unit), k) then
+				icon = v
+				break
+			end
+		end
+		nameplate.totemIcon:SetTexture("Interface\\Icons\\"..icon)
+		nameplate.totemIcon:Show()
+		nameplate.clickArea:SetWidth(TOTEM_WIDTH)
+		nameplate.clickArea:SetHeight(TOTEM_WIDTH)
+		nameplate.clickArea:SetPoint("TOPLEFT", nameplate.totemIcon, "TOPLEFT", 0, 0)
+		nameplate.clickArea:EnableMouse(true)
+	else
+		minimized = false
+		nameplate.totemIcon:Hide()
+		nameplate.healthBar:Show()
+		nameplate.highlight:Show()
+		parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 12, 0)
+		if UnitClassification(unit) ~= "worldboss" then
+			parent.level:Show()
+		else
+			parent.level:Hide()
+		end
+		nameplate.name:Show()
+		nameplate.clickArea:SetWidth(CLICK_AREA_WIDTH)
+		nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT)
+		nameplate.clickArea:SetPoint("TOPLEFT", nameplate.healthBar, "TOPLEFT", -2, 4)
+		nameplate.clickArea:EnableMouse(true)
+	end
+
+	if isTarget and not nameplate.strata then
+		nameplate:SetFrameStrata("LOW")
+		nameplate.strata = true
+		nameplate.glow:Show()
+		nameplate.name:SetTextColor(1, 1, 0)
+		if nameplate.totemIcon:IsShown() then
+			nameplate.totemGlow:Show()
+		end
+	elseif not isTarget and nameplate.strata then
+		nameplate:SetFrameStrata("BACKGROUND")
+		nameplate.strata = false
+		nameplate.glow:Hide()
+		nameplate.totemGlow:Hide()
+		nameplate.name:SetTextColor(1, 1, 1)
+	end
+
+	if UnitExists("mouseover") and not isTarget and UnitIsUnit(unit, "mouseover") and not nameplate.strata then
+		nameplate:SetFrameStrata("MEDIUM")
+		nameplate.strata = true
+		nameplate.name:SetTextColor(1, 1, 0)
+	elseif not isTarget and nameplate.strata then
+		nameplate:SetFrameStrata("BACKGROUND")
+		nameplate.strata = false
+		nameplate.name:SetTextColor(1, 1, 1)
+	end
+
+	if isTarget or not UnitExists("target") or creatureType == "Totem" or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
+		nameplate:SetAlpha(1)
+	else
+		nameplate:SetAlpha(ALPHA_INACTIVE)
+	end
+
+	if UnitClassification(unit) ~= "normal" then
+		nameplate.elite:Show()
+	else
+		nameplate.elite:Hide()
+	end
+
+	if UnitIsTapped(unit) and not UnitIsTappedByPlayer(unit) then
+		parent.border:SetDesaturated(true)
+		nameplate.healthBar:SetStatusBarColor(0.5, 0.5, 0.5)
+	else
+		parent.border:SetDesaturated(false)
+		if unit and UnitIsPlayer(unit) then
+			nameplate.healthBar:SetStatusBarColor(parent.classColor.r, parent.classColor.g, parent.classColor.b)
+		else
+			nameplate.healthBar:SetStatusBarColor(parent.healthBar:GetStatusBarColor())
+		end
+	end
+
+	if SpellIsTargeting() then
+		nameplate.clickArea:EnableMouse(false)
+	elseif not minimized then
+		nameplate.clickArea:EnableMouse(true)
+	end
+
+	if isMouseOver then
+		if UnitCanAttack("player", unit) then
+			if CheckInteractDistance(unit, 3) then
+				SetCursor("ATTACK_CURSOR")
+			else
+				SetCursor("ATTACK_ERROR_CURSOR")
+			end
+		end
+	end
+
+	castInfo = CastEvents[unit]
+	if castInfo and castInfo.spellID then
+		if castInfo.startTime + castInfo.duration < GetTime() then
+			wipe(castInfo)
+			nameplate.castBar:Hide()
+			nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT)
+			return
+		elseif castInfo.event == "CAST" or castInfo.event == "FAIL" then
+			wipe(castInfo)
+			nameplate.castBar:Hide()
+			nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT)
+			return
+		end
+		nameplate.castBar:SetMinMaxValues(castInfo.startTime, castInfo.endTime)
+		sparkPosition = 0
+		if castInfo.event == "CHANNEL" then
+			barValue = castInfo.startTime + (castInfo.endTime  - GetTime())
+			nameplate.castBar:SetValue(barValue)
+			sparkPosition = ((barValue - castInfo.startTime) / (castInfo.endTime - castInfo.startTime)) *  nameplate.castBar:GetWidth()
+		else
+			sparkPosition = ((GetTime() - castInfo.startTime) / (castInfo.endTime - castInfo.startTime)) * nameplate.castBar:GetWidth()
+			nameplate.castBar:SetValue(GetTime())
+		end
+		nameplate.castBarSpark:SetPoint("CENTER", nameplate.castBar, "LEFT", sparkPosition, 0)
+		nameplate.castBarIcon:SetTexture(castInfo.icon)
+		nameplate.castBar:Show()
+		nameplate.castBarText:SetText(castInfo.spellName)
+		nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT + nameplate.castBar:GetHeight() + 4)
+	else
+		nameplate.castBar:Hide()
+	end
 end
 
 local function CreatePlate(parent)
@@ -177,8 +400,8 @@ local function CreatePlate(parent)
 	parent.overhead = nameplate
 
 	parent:SetFrameStrata("BACKGROUND")
-	parent:SetHeight(ParentHeight)
-	parent:SetWidth(ParentWidth)
+	parent:SetHeight(PARENT_HEIGHT)
+	parent:SetWidth(PARENT_WIDTH)
 	parent:SetScript("OnShow", OnShow)
 	parent:SetScript("OnHide", OnHide)
 	parent:EnableMouse(false)
@@ -215,69 +438,21 @@ local function CreatePlate(parent)
 	nameplate.healthBar:SetMinMaxValues(parent.healthBar:GetMinMaxValues())
 	nameplate.healthBar:SetValue(parent.healthBar:GetValue())
 
-	parent.healthBar:SetScript("OnValueChanged", function()
-		local unit = parent:GetName(1)
-		if unit and UnitIsPlayer(unit) then
-			local _, class = UnitClass(unit)
-			parent.classColor = ClassColors[class]
-			nameplate.healthBar:SetStatusBarColor(parent.classColor.r, parent.classColor.g, parent.classColor.b)
-		else
-			nameplate.healthBar:SetStatusBarColor(parent.healthBar:GetStatusBarColor())
-		end
-		nameplate.healthBar:SetMinMaxValues(parent.healthBar:GetMinMaxValues())
-		nameplate.healthBar:SetValue(parent.healthBar:GetValue())
-	end)
+	parent.healthBar:SetScript("OnValueChanged", OnValueChanged)
 
-	ClickAreaWidth = parent.healthBar:GetWidth() + 30
-	ClickAreaHeight = parent.healthBar:GetHeight() + 8
+	CLICK_AREA_WIDTH = parent.healthBar:GetWidth() + 30
+	CLICK_AREA_HEIGHT = parent.healthBar:GetHeight() + 8
 
 	nameplate.clickArea = CreateFrame("Button", "$parentClickArea", nameplate)
 	nameplate.clickArea:SetPoint("TOPLEFT", nameplate.healthBar, "TOPLEFT", -2, 4)
-	nameplate.clickArea:SetWidth(ClickAreaWidth)
-	nameplate.clickArea:SetHeight(ClickAreaHeight)
+	nameplate.clickArea:SetWidth(CLICK_AREA_WIDTH)
+	nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT)
 	nameplate.clickArea:SetFrameLevel(2)
 	-- nameplate.clickArea:SetBackdrop(backdrop)
 	-- nameplate.clickArea:SetBackdropColor(0, 1, 0, 0.2)
-	nameplate.clickArea:SetScript("OnMouseDown", function()
-		if arg1 == "RightButton" then
-			MouselookStart()
-			Overhead.time = GetTime()
-			Overhead.frame = parent
-		else
-			parent:Click()
-			Overhead.frame = nil
-			Overhead.time = nil
-		end
-	end)
-
-	nameplate.clickArea:SetScript("OnEnter", function()
-		nameplate:SetFrameStrata("MEDIUM")
-		nameplate:SetAlpha(1)
-		nameplate.name:SetTextColor(1, 1, 0)
-		-- SetMouseoverUnit(parent:GetName(1))
-		if nameplate.totemIcon:IsShown() then
-			nameplate.totemHighlight:Show()
-		end
-	end)
-
-	nameplate.clickArea:SetScript("OnLeave", function()
-		if not nameplate.strata then
-			if not SpellIsTargeting() then
-				nameplate:SetFrameStrata("BACKGROUND")
-			end
-			nameplate:SetAlpha(1)
-		elseif nameplate.strata then
-			nameplate:SetFrameStrata("LOW")
-			nameplate:SetAlpha(1)
-		else
-			nameplate:SetAlpha(InactiveAlpha)
-		end
-		if not UnitIsUnit("target", parent.unit or "") then
-			nameplate.name:SetTextColor(1, 1, 1)
-		end
-		nameplate.totemHighlight:Hide()
-		-- SetMouseoverUnit()
-	end)
+	nameplate.clickArea:SetScript("OnMouseDown", OnMouseDown)
+	nameplate.clickArea:SetScript("OnEnter", OnEnter)
+	nameplate.clickArea:SetScript("OnLeave", OnLeave)
 
 	nameplate.glow = nameplate.healthBar:CreateTexture("$parentGlow", "BACKGROUND")
 	nameplate.glow:SetPoint("CENTER", nameplate.healthBar, "CENTER", 10, 0)
@@ -370,8 +545,8 @@ local function CreatePlate(parent)
 	nameplate.castBarIcon:SetTexture(0)
 
 	nameplate.totemIcon = nameplate:CreateTexture("$parentTotemIcon", "BORDER")
-	nameplate.totemIcon:SetWidth(TotemWidth)
-	nameplate.totemIcon:SetHeight(TotemWidth)
+	nameplate.totemIcon:SetWidth(TOTEM_WIDTH)
+	nameplate.totemIcon:SetHeight(TOTEM_WIDTH)
 	nameplate.totemIcon:SetPoint("CENTER", nameplate, "CENTER", 0, 0)
 	nameplate.totemIcon:SetTexCoord(0.07, 0.90, 0.1, 0.93)
 	nameplate.totemIcon:SetTexture("Interface\\Icons\\spell_fire_selfdestruct")
@@ -379,8 +554,8 @@ local function CreatePlate(parent)
 
 	nameplate.totemGlow = nameplate:CreateTexture("$parentTotemGlow", "BACKGROUND")
 	nameplate.totemGlow:SetTexture("Interface\\AddOns\\Overhead\\Glow")
-	nameplate.totemGlow:SetWidth(TotemWidth * 3)
-	nameplate.totemGlow:SetHeight(TotemWidth * 3)
+	nameplate.totemGlow:SetWidth(TOTEM_WIDTH * 3)
+	nameplate.totemGlow:SetHeight(TOTEM_WIDTH * 3)
 	nameplate.totemGlow:SetPoint("CENTER", nameplate.totemIcon)
 	nameplate.totemGlow:SetVertexColor(1, 1, 1, 0.4)
 	nameplate.totemGlow:Hide()
@@ -394,164 +569,7 @@ local function CreatePlate(parent)
 	nameplate.totemHighlight:SetVertexColor(1, 1, 1, 0.5)
 	nameplate.totemHighlight:Hide()
 
-	local castInfo, isTarget, unit, creatureType
-	local icon = "spell_fire_selfdestruct"
-	local sparkPosition, barValue = 0, 0
-	local minimized = false
-	local isMouseOver = false
-
-	nameplate:SetScript("OnUpdate", function()
-		isTarget = UnitExists("target") and parent:GetAlpha() == 1
-		unit = parent:GetName(1)
-		creatureType = UnitCreatureType(unit)
-		nameplate.clickArea.unit = unit
-		parent:EnableMouse(false)
-		isMouseOver = GetMouseFocus() == nameplate.clickArea
-		nameplate.name:SetText(parent.name:GetText())
-
-		if creatureType == "Critter" then
-			minimized = true
-			nameplate.healthBar:Hide()
-			nameplate.highlight:Hide()
-			nameplate.totemIcon:Hide()
-			nameplate.clickArea:EnableMouse(false)
-			nameplate.name:Hide()
-			parent.level:Hide()
-			-- parent.level:SetPoint("CENTER", parent.name, "RIGHT", 12, 0)
-		elseif creatureType == "Totem" then
-			minimized = true
-			nameplate.healthBar:Hide()
-			nameplate.highlight:Hide()
-			parent.level:Hide()
-			nameplate.name:Hide()
-			for k, v in pairs(Totems) do
-				if strfind(UnitName(unit), k) then
-					icon = v
-					break
-				end
-			end
-			nameplate.totemIcon:SetTexture("Interface\\Icons\\"..icon)
-			nameplate.totemIcon:Show()
-			nameplate.clickArea:SetWidth(TotemWidth)
-			nameplate.clickArea:SetHeight(TotemWidth)
-			nameplate.clickArea:SetPoint("TOPLEFT", nameplate.totemIcon, "TOPLEFT", 0, 0)
-			nameplate.clickArea:EnableMouse(true)
-		else
-			minimized = false
-			nameplate.totemIcon:Hide()
-			nameplate.healthBar:Show()
-			nameplate.highlight:Show()
-			parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 12, 0)
-			if UnitClassification(unit) ~= "worldboss" then
-				parent.level:Show()
-			else
-				parent.level:Hide()
-			end
-			nameplate.name:Show()
-			nameplate.clickArea:SetWidth(ClickAreaWidth)
-			nameplate.clickArea:SetHeight(ClickAreaHeight)
-			nameplate.clickArea:SetPoint("TOPLEFT", nameplate.healthBar, "TOPLEFT", -2, 4)
-			nameplate.clickArea:EnableMouse(true)
-		end
-
-		if isTarget and not nameplate.strata then
-			nameplate:SetFrameStrata("LOW")
-			nameplate.strata = true
-			nameplate.glow:Show()
-			nameplate.name:SetTextColor(1, 1, 0)
-			if nameplate.totemIcon:IsShown() then
-				nameplate.totemGlow:Show()
-			end
-		elseif not isTarget and nameplate.strata then
-			nameplate:SetFrameStrata("BACKGROUND")
-			nameplate.strata = false
-			nameplate.glow:Hide()
-			nameplate.totemGlow:Hide()
-			nameplate.name:SetTextColor(1, 1, 1)
-		end
-
-		if UnitExists("mouseover") and not isTarget and UnitIsUnit(unit, "mouseover") and not nameplate.strata then
-			nameplate:SetFrameStrata("MEDIUM")
-			nameplate.strata = true
-			nameplate.name:SetTextColor(1, 1, 0)
-		elseif not isTarget and nameplate.strata then
-			nameplate:SetFrameStrata("BACKGROUND")
-			nameplate.strata = false
-			nameplate.name:SetTextColor(1, 1, 1)
-		end
-
-		if isTarget or not UnitExists("target") or creatureType == "Totem" or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
-			nameplate:SetAlpha(1)
-		else
-			nameplate:SetAlpha(InactiveAlpha)
-		end
-
-		if UnitClassification(unit) ~= "normal" then
-			nameplate.elite:Show()
-		else
-			nameplate.elite:Hide()
-		end
-
-		if UnitIsTapped(unit) and not UnitIsTappedByPlayer(unit) then
-			parent.border:SetDesaturated(true)
-			nameplate.healthBar:SetStatusBarColor(0.5, 0.5, 0.5)
-		else
-			parent.border:SetDesaturated(false)
-			if unit and UnitIsPlayer(unit) then
-				nameplate.healthBar:SetStatusBarColor(parent.classColor.r, parent.classColor.g, parent.classColor.b)
-			else
-				nameplate.healthBar:SetStatusBarColor(parent.healthBar:GetStatusBarColor())
-			end
-		end
-
-		if SpellIsTargeting() then
-			nameplate.clickArea:EnableMouse(false)
-		elseif not minimized then
-			nameplate.clickArea:EnableMouse(true)
-		end
-
-		if isMouseOver then
-			if UnitCanAttack("player", unit) then
-				if CheckInteractDistance(unit, 3) then
-					SetCursor("ATTACK_CURSOR")
-				else
-					SetCursor("Interface\\Cursor\\UnableAttack")
-				end
-			end
-		end
-
-		castInfo = CastEvents[unit]
-		if castInfo and castInfo.spellID then
-			if castInfo.startTime + castInfo.duration < GetTime() then
-				wipe(castInfo)
-				nameplate.castBar:Hide()
-				nameplate.clickArea:SetHeight(ClickAreaHeight)
-				return
-			elseif castInfo.event == "CAST" or castInfo.event == "FAIL" then
-				wipe(castInfo)
-				nameplate.castBar:Hide()
-				nameplate.clickArea:SetHeight(ClickAreaHeight)
-				return
-			end
-			nameplate.castBar:SetMinMaxValues(castInfo.startTime, castInfo.endTime)
-			sparkPosition = 0
-			if castInfo.event == "CHANNEL" then
-				barValue = castInfo.startTime + (castInfo.endTime  - GetTime())
-				nameplate.castBar:SetValue(barValue)
-				sparkPosition = ((barValue - castInfo.startTime) / (castInfo.endTime - castInfo.startTime)) *  nameplate.castBar:GetWidth()
-			else
-				sparkPosition = ((GetTime() - castInfo.startTime) / (castInfo.endTime - castInfo.startTime)) * nameplate.castBar:GetWidth()
-				nameplate.castBar:SetValue(GetTime())
-			end
-			nameplate.castBarSpark:SetPoint("CENTER", nameplate.castBar, "LEFT", sparkPosition, 0)
-			nameplate.castBarIcon:SetTexture(castInfo.icon)
-			nameplate.castBar:Show()
-			nameplate.castBarText:SetText(castInfo.spellName)
-			nameplate.clickArea:SetHeight(ClickAreaHeight + nameplate.castBar:GetHeight() + 4)
-		else
-			nameplate.castBar:Hide()
-		end
-	end)
+	nameplate:SetScript("OnUpdate", OnUpdate)
 end
 
 Overhead:SetScript("OnUpdate", function()
