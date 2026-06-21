@@ -271,7 +271,7 @@ local function OnUpdate()
 		nameplate.healthBar:Show()
 		nameplate.highlight:Show()
 		parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 12, 0)
-		if UnitClassification(unit) ~= "worldboss" then
+		if UnitClassification(unit) ~= "worldboss" and UnitLevel(unit) > 0 then
 			parent.level:Show()
 		else
 			parent.level:Hide()
