@@ -54,7 +54,7 @@ local Totems = {
 
 local ClassColors = {
 	["WARRIOR"] = { r = 0.78, g = 0.61, b = 0.43, hex = "|cffc79c6e" },
-	["MAGE"]    = { r = 0.41, g = 0.8,  b = 0.94, hex = "|cff69ccf0" },
+	["MAGE"]	= { r = 0.41, g = 0.8,  b = 0.94, hex = "|cff69ccf0" },
 	["ROGUE"]   = { r = 1.0,  g = 0.96, b = 0.41, hex = "|cfffff569" },
 	["DRUID"]   = { r = 1.0,  g = 0.49, b = 0.04, hex = "|cffff7d0a" },
 	["HUNTER"]  = { r = 0.67, g = 0.83, b = 0.45, hex = "|cffabd473" },
@@ -230,8 +230,8 @@ local function OnUpdate()
 	local isMouseOver = false
 	local nameplate = this
 	local parent = nameplate.parent
-	isTarget = UnitExists("target") and parent:GetAlpha() == 1
-	unit = parent:GetName(1)
+	unit = parent:GetName(true)
+	isTarget = UnitIsUnit("target", unit)
 	creatureType = UnitCreatureType(unit)
 	nameplate.clickArea.unit = unit
 	parent:EnableMouse(false)
@@ -246,7 +246,6 @@ local function OnUpdate()
 		nameplate.clickArea:EnableMouse(false)
 		nameplate.name:Hide()
 		parent.level:Hide()
-		-- parent.level:SetPoint("CENTER", parent.name, "RIGHT", 12, 0)
 	elseif creatureType == "Totem" then
 		minimized = true
 		nameplate.healthBar:Hide()
@@ -270,7 +269,7 @@ local function OnUpdate()
 		nameplate.totemIcon:Hide()
 		nameplate.healthBar:Show()
 		nameplate.highlight:Show()
-		parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 12, 0)
+		parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 11, 0)
 		if UnitClassification(unit) ~= "worldboss" and UnitLevel(unit) > 0 then
 			parent.level:Show()
 		else
@@ -283,17 +282,21 @@ local function OnUpdate()
 		nameplate.clickArea:EnableMouse(true)
 	end
 
-	if isTarget and not nameplate.strata then
-		nameplate:SetFrameStrata("LOW")
-		nameplate.strata = true
+	if isTarget then
+		if not nameplate.strata then
+			nameplate:SetFrameStrata("LOW")
+			nameplate.strata = true
+		end
 		nameplate.glow:Show()
 		nameplate.name:SetTextColor(1, 1, 0)
 		if nameplate.totemIcon:IsShown() then
 			nameplate.totemGlow:Show()
 		end
-	elseif not isTarget and nameplate.strata then
-		nameplate:SetFrameStrata("BACKGROUND")
-		nameplate.strata = false
+	else
+		if nameplate.strata then
+			nameplate:SetFrameStrata("BACKGROUND")
+			nameplate.strata = false
+		end
 		nameplate.glow:Hide()
 		nameplate.totemGlow:Hide()
 		nameplate.name:SetTextColor(1, 1, 1)
@@ -315,7 +318,7 @@ local function OnUpdate()
 		nameplate:SetAlpha(ALPHA_INACTIVE)
 	end
 
-	if UnitClassification(unit) ~= "normal" then
+	if UnitClassification(unit) ~= "normal" and not minimized then
 		nameplate.elite:Show()
 	else
 		nameplate.elite:Hide()
@@ -426,8 +429,8 @@ local function CreatePlate(parent)
 	local point, relativeTo, relativePoint, x, y = parent.healthBar:GetPoint()
 	nameplate.healthBar:SetPoint(point, nameplate, relativePoint, x, y)
 	nameplate.healthBar:SetOrientation("HORIZONTAL")
-	nameplate.healthBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-	-- nameplate.healthBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-TargetingFrame-BarFill")
+	-- nameplate.healthBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+	nameplate.healthBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-TargetingFrame-BarFill")
 	nameplate.healthBar:SetFrameLevel(1)
 
 	if parent.unit and UnitIsPlayer(parent.unit) then
@@ -467,12 +470,12 @@ local function CreatePlate(parent)
 	-- nameplate.background:SetPoint("CENTER", nameplate.healthBar, "CENTER", 0, 0)
 	-- nameplate.background:SetWidth(nameplate.healthBar:GetWidth())
 	-- nameplate.background:SetHeight(nameplate.healthBar:GetHeight())
-	-- nameplate.background:SetTexture(0, 0, 0, 1)
+	-- nameplate.background:SetTexture(0, 0, 0, 0.45)
 
 	parent.border:SetParent(nameplate.healthBar)
 	parent.border:ClearAllPoints()
 	parent.border:SetPoint("BOTTOMLEFT", nameplate.healthBar, "BOTTOMLEFT", -5, -6)
-	parent.border:SetWidth(nameplate.healthBar:GetWidth() + 32)
+	parent.border:SetWidth(nameplate.healthBar:GetWidth() + 31)
 	parent.border:SetHeight(nameplate.healthBar:GetHeight() * 2 + 21)
 	parent.border:SetDrawLayer("OVERLAY")
 
@@ -491,12 +494,12 @@ local function CreatePlate(parent)
 
 	parent.level:SetParent(nameplate)
 	parent.level:ClearAllPoints()
-	parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 12, 0)
+	parent.level:SetPoint("CENTER", nameplate.healthBar, "RIGHT", 11, 0)
 	parent.level:SetDrawLayer("OVERLAY")
 
 	parent.levelIcon:SetParent(nameplate)
 	parent.levelIcon:ClearAllPoints()
-	parent.levelIcon:SetPoint("LEFT", nameplate.healthBar, "RIGHT", 6, 0)
+	parent.levelIcon:SetPoint("LEFT", nameplate.healthBar, "RIGHT", 4, 0)
 	parent.levelIcon:SetDrawLayer("OVERLAY")
 
 	nameplate.name = nameplate:CreateFontString("$parentName", "OVERLAY", "GameFontHighlightLarge")
@@ -532,6 +535,10 @@ local function CreatePlate(parent)
 	nameplate.castBarSpark:SetWidth(32)
 	nameplate.castBarSpark:SetHeight(32)
 	nameplate.castBarSpark:SetBlendMode("ADD")
+
+	-- nameplate.castBarBackground = nameplate.castBar:CreateTexture("$parentCastBarBackground", "BACKGROUND")
+	-- nameplate.castBarBackground:SetAllPoints()
+	-- nameplate.castBarBackground:SetTexture(0, 0, 0, 0.45)
 
 	nameplate.castBarBorder = nameplate.castBar:CreateTexture("$parentCastBarBorder", "ARTWORK")
 	nameplate.castBarBorder:SetTexture("Interface\\AddOns\\Overhead\\CastBar")
