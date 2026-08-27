@@ -230,7 +230,7 @@ local function OnUpdate()
 	local isMouseOver = false
 	local nameplate = this
 	local parent = nameplate.parent
-	unit = parent:GetName(true)
+	unit = parent:GetName(1)
 	isTarget = UnitIsUnit("target", unit)
 	creatureType = UnitCreatureType(unit)
 	nameplate.clickArea.unit = unit
