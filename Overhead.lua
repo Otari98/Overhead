@@ -142,23 +142,6 @@ Overhead:SetScript("OnEvent", function()
 	end
 end)
 
-local function OnShow()
-	this:SetHeight(PARENT_HEIGHT)
-	this:SetWidth(PARENT_WIDTH)
-	this.unit = this:GetName(1)
-	this.overhead.clickArea.unit = this.unit
-	if this.unit and UnitIsPlayer(this.unit) then
-		this.overhead.healthBar:SetStatusBarColor(this.classColor.r, this.classColor.g, this.classColor.b)
-	else
-		this.overhead.healthBar:SetStatusBarColor(this.healthBar:GetStatusBarColor())
-	end
-end
-
-local function OnHide()
-	this.unit = nil
-	this.overhead.clickArea.unit = nil
-end
-
 local function OnValueChanged()
 	local parent = this:GetParent()
 	local unit = parent:GetName(1)
@@ -222,20 +205,16 @@ local function OnLeave()
 	-- SetMouseoverUnit()
 end
 
-local function OnUpdate()
-	local castInfo, isTarget, unit, creatureType
-	local icon = "spell_fire_selfdestruct"
-	local sparkPosition, barValue = 0, 0
+local function OnUpdate(self)
 	local minimized = false
-	local isMouseOver = false
-	local nameplate = this
+	local nameplate = self or this
 	local parent = nameplate.parent
-	unit = parent:GetName(1)
-	isTarget = UnitIsUnit("target", unit)
-	creatureType = UnitCreatureType(unit)
+	local unit = parent:GetName(1)
+	local isTarget = UnitIsUnit("target", unit)
+	local isMouseOver = GetMouseFocus() == nameplate.clickArea
+	local creatureType = UnitCreatureType(unit)
 	nameplate.clickArea.unit = unit
 	parent:EnableMouse(false)
-	isMouseOver = GetMouseFocus() == nameplate.clickArea
 	nameplate.name:SetText(parent.name:GetText())
 
 	if creatureType == "Critter" then
@@ -243,7 +222,7 @@ local function OnUpdate()
 		nameplate.healthBar:Hide()
 		nameplate.highlight:Hide()
 		nameplate.totemIcon:Hide()
-		nameplate.clickArea:EnableMouse(false)
+		nameplate.clickArea:Hide()
 		nameplate.name:Hide()
 		parent.level:Hide()
 	elseif creatureType == "Totem" then
@@ -252,8 +231,9 @@ local function OnUpdate()
 		nameplate.highlight:Hide()
 		parent.level:Hide()
 		nameplate.name:Hide()
+		local icon = "spell_fire_selfdestruct"
 		for k, v in pairs(Totems) do
-			if strfind(UnitName(unit), k) then
+			if strfind(UnitName(unit), k, 1, true) then
 				icon = v
 				break
 			end
@@ -263,7 +243,7 @@ local function OnUpdate()
 		nameplate.clickArea:SetWidth(TOTEM_WIDTH)
 		nameplate.clickArea:SetHeight(TOTEM_WIDTH)
 		nameplate.clickArea:SetPoint("TOPLEFT", nameplate.totemIcon, "TOPLEFT", 0, 0)
-		nameplate.clickArea:EnableMouse(true)
+		nameplate.clickArea:Show()
 	else
 		minimized = false
 		nameplate.totemIcon:Hide()
@@ -279,7 +259,7 @@ local function OnUpdate()
 		nameplate.clickArea:SetWidth(CLICK_AREA_WIDTH)
 		nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT)
 		nameplate.clickArea:SetPoint("TOPLEFT", nameplate.healthBar, "TOPLEFT", -2, 4)
-		nameplate.clickArea:EnableMouse(true)
+		nameplate.clickArea:Show()
 	end
 
 	if isTarget then
@@ -337,9 +317,9 @@ local function OnUpdate()
 	end
 
 	if SpellIsTargeting() then
-		nameplate.clickArea:EnableMouse(false)
+		nameplate.clickArea:Hide()
 	elseif not minimized then
-		nameplate.clickArea:EnableMouse(true)
+		nameplate.clickArea:Show()
 	end
 
 	if isMouseOver then
@@ -352,7 +332,7 @@ local function OnUpdate()
 		end
 	end
 
-	castInfo = CastEvents[unit]
+	local castInfo = CastEvents[unit]
 	if castInfo and castInfo.spellID then
 		if castInfo.startTime + castInfo.duration < GetTime() then
 			wipe(castInfo)
@@ -366,7 +346,7 @@ local function OnUpdate()
 			return
 		end
 		nameplate.castBar:SetMinMaxValues(castInfo.startTime, castInfo.endTime)
-		sparkPosition = 0
+		local sparkPosition, barValue = 0, 0
 		if castInfo.event == "CHANNEL" then
 			barValue = castInfo.startTime + (castInfo.endTime  - GetTime())
 			nameplate.castBar:SetValue(barValue)
@@ -383,6 +363,20 @@ local function OnUpdate()
 	else
 		nameplate.castBar:Hide()
 	end
+end
+
+local function OnShow(self)
+	local parent = self or this
+	parent:SetHeight(PARENT_HEIGHT)
+	parent:SetWidth(PARENT_WIDTH)
+	parent.unit = parent:GetName(1)
+	OnUpdate(parent.overhead)
+end
+
+local function OnHide(self)
+	local parent = self or this
+	parent.unit = nil
+	parent.overhead.clickArea.unit = nil
 end
 
 local function CreatePlate(parent)
