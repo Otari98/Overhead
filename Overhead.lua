@@ -600,7 +600,7 @@ Overhead:SetScript("OnUpdate", function()
 
 	if not IsMouselooking() then
 		Overhead.frame:Click("LeftButton")
-		if UnitCanAttack("player", "target") and not Overhead.isAttacking then
+		if UnitCanAttack("player", "target") and not Overhead.isAttacking and CheckInteractDistance("target", 3) then
 			AttackTarget()
 			Overhead.frame = nil
 			Overhead.time = nil
