@@ -164,7 +164,7 @@ local function OnEnter()
 	end
 	local nameplate = this:GetParent()
 	nameplate:SetFrameStrata("MEDIUM")
-	nameplate:SetAlpha(1)
+	nameplate.parent:SetAlpha(1)
 	nameplate.name:SetTextColor(1, 1, 0)
 	SetMouseoverUnit(nameplate.parent:GetName(1))
 	if nameplate.totemIcon:IsShown() then
@@ -180,12 +180,12 @@ local function OnLeave()
 	local parent = nameplate.parent
 	if not nameplate.strata then
 		nameplate:SetFrameStrata("BACKGROUND")
-		nameplate:SetAlpha(1)
+		parent:SetAlpha(1)
 	elseif nameplate.strata then
 		nameplate:SetFrameStrata("LOW")
-		nameplate:SetAlpha(1)
+		parent:SetAlpha(1)
 	else
-		nameplate:SetAlpha(ALPHA_INACTIVE)
+		parent:SetAlpha(ALPHA_INACTIVE)
 	end
 	if not UnitIsUnit("target", parent.unit or "") then
 		nameplate.name:SetTextColor(1, 1, 1)
@@ -282,9 +282,9 @@ local function OnUpdate(self)
 	end
 
 	if isTarget or not UnitExists("target") or creatureType == "Totem" or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
-		nameplate:SetAlpha(1)
+		parent:SetAlpha(1)
 	else
-		nameplate:SetAlpha(ALPHA_INACTIVE)
+		parent:SetAlpha(ALPHA_INACTIVE)
 	end
 
 	if UnitClassification(unit) ~= "normal" and not minimized then
