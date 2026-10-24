@@ -201,12 +201,23 @@ local function OnUpdate(self)
 	local unit = parent:GetName(1)
 	local isTarget = UnitIsUnit("target", unit)
 	local isMouseOver = GetMouseFocus() == nameplate.clickArea
-	local creatureType = UnitCreatureType(unit)
+	local isTotem, isCritter
+
+	if UnitCreatureTypeID then
+		local id = UnitCreatureTypeID(unit)
+		isTotem = id == 11
+		isCritter = id == 8
+	else
+		local type = UnitCreatureType(unit)
+		isTotem = type == "Totem"
+		isCritter = not isTotem and type == "Critter"
+	end
+
 	nameplate.clickArea.unit = unit
 	parent:EnableMouse(false)
 	nameplate.name:SetText(parent.name:GetText())
 
-	if creatureType == "Critter" then
+	if isCritter then
 		minimized = true
 		nameplate.healthBar:Hide()
 		nameplate.highlight:Hide()
@@ -214,7 +225,7 @@ local function OnUpdate(self)
 		nameplate.clickArea:Hide()
 		nameplate.name:Hide()
 		parent.level:Hide()
-	elseif creatureType == "Totem" then
+	elseif isTotem then
 		minimized = true
 		nameplate.healthBar:Hide()
 		nameplate.highlight:Hide()
@@ -281,7 +292,7 @@ local function OnUpdate(self)
 		nameplate.name:SetTextColor(1, 1, 1)
 	end
 
-	if isTarget or not UnitExists("target") or creatureType == "Totem" or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
+	if isTarget or not UnitExists("target") or isTotem or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
 		parent:SetAlpha(1)
 	else
 		parent:SetAlpha(ALPHA_INACTIVE)
