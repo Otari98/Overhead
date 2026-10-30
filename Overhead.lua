@@ -94,7 +94,6 @@ Overhead:SetScript("OnEvent", function()
 		local eventType = arg3 -- "START", "CAST", "FAIL", "CHANNEL", "MAINHAND", "OFFHAND"
 		local spellID = arg4
 		local castDuration = (arg5 or 0) / 1000
-		local spellName, _, icon = SpellInfo(spellID)
 		if eventType == "MAINHAND" or eventType == "OFFHAND" then
 			return
 		end
@@ -110,6 +109,7 @@ Overhead:SetScript("OnEvent", function()
 				wipe(CastEvents[casterGUID])
 			end
 			local now = GetTime()
+			local spellName, _, icon = SpellInfo(spellID)
 			CastEvents[casterGUID].event = eventType
 			CastEvents[casterGUID].spellID = spellID
 			CastEvents[casterGUID].spellName = spellName
@@ -501,6 +501,7 @@ local function CreatePlate(parent)
 	nameplate.castBar:SetPoint("TOPLEFT", nameplate.healthBar, "BOTTOMLEFT", 22, -4)
 	nameplate.castBar:SetOrientation("HORIZONTAL")
 	nameplate.castBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+	nameplate.castBar:GetStatusBarTexture():SetDrawLayer("BACKGROUND")
 	nameplate.castBar:SetStatusBarColor(1, 0.82, 0, 1)
 	nameplate.castBar:SetFrameLevel(2)
 	nameplate.castBar:Hide()
