@@ -1,4 +1,4 @@
-if not SUPERWOW_VERSION then return end
+local Overhead = CreateFrame("Frame", "OverheadFrame", UIParent)
 
 local CLICK_AREA_WIDTH
 local CLICK_AREA_HEIGHT
@@ -10,9 +10,7 @@ local PARENT_HEIGHT = 1
 local ALPHA_INACTIVE = 0.6
 local TOTEM_WIDTH = 32
 
-
 local Registry = {}
-local CastEvents = {}
 
 local Totems = {
 	["Disease Cleansing Totem"] = "spell_nature_diseasecleansingtotem",
@@ -56,18 +54,10 @@ local ClassColors = {
 }
 
 local function IsNamePlate(frame)
-	if not (frame and frame.GetObjectType) then return false end
-	if frame:GetObjectType() ~= "Button" then return false end
+	if not (frame and frame.GetObjectType and frame:GetObjectType() == "Button") then return false end
 	local regions = frame:GetRegions()
 	if not (regions and regions.GetObjectType and regions.GetTexture) then return false end
 	return regions:GetObjectType() == "Texture" and regions:GetTexture() == "Interface\\Tooltips\\Nameplate-Border"
-end
-
-local wipe = table.wipe or function(t)
-	if not (t and type(t) == "table") then error("Usage: table.wipe(table)") return end
-	for k in pairs(t) do rawset(t, k, nil) end
-	table.setn(t, 0)
-	return t
 end
 
 print = print or function(...)
@@ -75,65 +65,9 @@ print = print or function(...)
 	DEFAULT_CHAT_FRAME:AddMessage(table.concat(arg, " "))
 end
 
-local Overhead = CreateFrame("Frame", "OverheadFrame", UIParent)
-Overhead:RegisterEvent("UNIT_CASTEVENT")
-Overhead:RegisterEvent("PLAYER_ENTER_COMBAT")
-Overhead:RegisterEvent("PLAYER_LEAVE_COMBAT")
-Overhead.isAttacking = false
-Overhead.frame = nil
-Overhead.time = nil
-
-Overhead:SetScript("OnEvent", function()
-	if event == "UNIT_CASTEVENT" then
-		local casterGUID = arg1
-		local _, playerGUID = UnitExists("player")
-		if casterGUID == playerGUID then
-			return
-		end
-		-- local targetGUID = arg2
-		local eventType = arg3 -- "START", "CAST", "FAIL", "CHANNEL", "MAINHAND", "OFFHAND"
-		local spellID = arg4
-		local castDuration = (arg5 or 0) / 1000
-		if eventType == "MAINHAND" or eventType == "OFFHAND" then
-			return
-		end
-		if eventType == "CAST" then
-			if not CastEvents[casterGUID] or spellID ~= CastEvents[casterGUID].spellID then
-				return
-			end
-		end
-		if eventType == "START" or eventType == "CHANNEL" then
-			if not CastEvents[casterGUID] then
-				CastEvents[casterGUID] = {}
-			else
-				wipe(CastEvents[casterGUID])
-			end
-			local now = GetTime()
-			local spellName, _, icon = SpellInfo(spellID)
-			CastEvents[casterGUID].event = eventType
-			CastEvents[casterGUID].spellID = spellID
-			CastEvents[casterGUID].spellName = spellName
-			CastEvents[casterGUID].icon = icon
-			CastEvents[casterGUID].startTime = now
-			CastEvents[casterGUID].duration = castDuration
-			CastEvents[casterGUID].endTime = now + castDuration
-		elseif eventType == "FAIL" then
-			if CastEvents[casterGUID] then
-				wipe(CastEvents[casterGUID])
-			end
-		end
-	elseif event == "PLAYER_ENTER_COMBAT" then
-		Overhead.isAttacking = true
-	elseif event == "PLAYER_LEAVE_COMBAT" then
-		Overhead.isAttacking = false
-		Overhead.frame = nil
-		Overhead.time = nil
-	end
-end)
-
-local function OnValueChanged()
-	local parent = this:GetParent()
-	local unit = parent:GetName(1)
+local function OnValueChanged(parentHealthBar)
+	local parent = parentHealthBar:GetParent()
+	local unit = parent.unit
 	local nameplate = parent.overhead
 	if unit and UnitIsPlayer(unit) then
 		local _, class = UnitClass(unit)
@@ -146,37 +80,36 @@ local function OnValueChanged()
 	nameplate.healthBar:SetValue(parent.healthBar:GetValue())
 end
 
-local function OnMouseDown()
-	if arg1 == "RightButton" then
+local function OnMouseDown(clickArea, button)
+	if button == "RightButton" then
 		MouselookStart()
 		Overhead.time = GetTime() + 0.5
-		Overhead.frame = this:GetParent().parent
+		Overhead.frame = clickArea:GetParent().parent
 	else
-		this:GetParent().parent:Click()
+		clickArea:GetParent().parent:Click()
 		Overhead.frame = nil
 		Overhead.time = nil
 	end
 end
 
-local function OnEnter()
+local function OnEnter(clickArea)
 	if SpellIsTargeting() then
 		return
 	end
-	local nameplate = this:GetParent()
+	local nameplate = clickArea:GetParent()
 	nameplate:SetFrameStrata("MEDIUM")
 	nameplate.parent:SetAlpha(1)
 	nameplate.name:SetTextColor(1, 1, 0)
-	SetMouseoverUnit(nameplate.parent:GetName(1))
 	if nameplate.totemIcon:IsShown() then
 		nameplate.totemHighlight:Show()
 	end
 end
 
-local function OnLeave()
+local function OnLeave(clickArea)
 	if SpellIsTargeting() then
 		return
 	end
-	local nameplate = this:GetParent()
+	local nameplate = clickArea:GetParent()
 	local parent = nameplate.parent
 	if not nameplate.strata then
 		nameplate:SetFrameStrata("BACKGROUND")
@@ -191,28 +124,21 @@ local function OnLeave()
 		nameplate.name:SetTextColor(1, 1, 1)
 	end
 	nameplate.totemHighlight:Hide()
-	SetMouseoverUnit(nil)
 end
 
-local function OnUpdate(self)
-	local minimized = false
-	local nameplate = self or this
+local function OnUpdate(nameplate)
 	local parent = nameplate.parent
-	local unit = parent:GetName(1)
+	local unit = parent.unit
+	if not unit then return end
+	local minimized = false
 	local isTarget = UnitIsUnit("target", unit)
 	local isMouseOver = GetMouseFocus() == nameplate.clickArea
-	local isTotem, isCritter
-
-	if UnitCreatureTypeID then
-		local id = UnitCreatureTypeID(unit)
-		isTotem = id == 11
-		isCritter = id == 8
-	else
-		local type = UnitCreatureType(unit)
-		isTotem = type == "Totem"
-		isCritter = not isTotem and type == "Critter"
-	end
-
+	local creatureType = UnitCreatureTypeID(unit)
+	local isCritter = creatureType == 8
+	local isTotem = creatureType == 11
+	-- local isPet = UnitIsPet(unit)
+	-- local isMinion = UnitIsMinion(unit)
+	local isPlayer = UnitIsPlayer(unit)
 	nameplate.clickArea.unit = unit
 	parent:EnableMouse(false)
 	nameplate.name:SetText(parent.name:GetText())
@@ -233,10 +159,7 @@ local function OnUpdate(self)
 		nameplate.name:Hide()
 		local icon = "spell_fire_selfdestruct"
 		for k, v in pairs(Totems) do
-			if string.find(UnitName(unit), k, 1, true) then
-				icon = v
-				break
-			end
+			if string.find(UnitName(unit), k, 1, true) then icon = v; break end
 		end
 		nameplate.totemIcon:SetTexture("Interface\\Icons\\"..icon)
 		nameplate.totemIcon:Show()
@@ -293,7 +216,7 @@ local function OnUpdate(self)
 	end
 
 	if isTarget or not UnitExists("target") or isTotem or isMouseOver or (UnitExists("mouseover") and UnitIsUnit(unit, "mouseover")) then
-		parent:SetAlpha(1)
+		nameplate:SetAlpha(1)
 	else
 		parent:SetAlpha(ALPHA_INACTIVE)
 	end
@@ -309,7 +232,7 @@ local function OnUpdate(self)
 		nameplate.healthBar:SetStatusBarColor(0.5, 0.5, 0.5)
 	else
 		parent.border:SetDesaturated(false)
-		if unit and UnitIsPlayer(unit) then
+		if unit and isPlayer then
 			local _, class = UnitClass(unit)
 			local color = ClassColors[class]
 			nameplate.healthBar:SetStatusBarColor(color.r, color.g, color.b)
@@ -336,32 +259,30 @@ local function OnUpdate(self)
 		end
 	end
 
-	local castInfo = CastEvents[unit]
-	if castInfo and castInfo.spellID then
-		local now = GetTime()
-		local startTime = castInfo.startTime
-		local endTime = castInfo.endTime
-		local event = castInfo.event
-		if (startTime + castInfo.duration < now) or (event == "CAST" or event == "FAIL") then
-			wipe(castInfo)
-			nameplate.castBar:Hide()
-			nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT)
-			return
-		end
-		nameplate.castBar:SetMinMaxValues(startTime, endTime)
+	local nameCast, displayNameCast, textureCast, startTimeMsCast, endTimeMsCast = C_Spell.UnitCastingInfo(unit)
+	local nameChan, displayNameChan, textureChan, startTimeMsChan, endTimeMsChan = C_Spell.UnitChannelInfo(unit)
+	if nameCast or nameChan then
 		local sparkPosition, barValue = 0, 0
-		if event == "CHANNEL" then
-			barValue = startTime + (endTime - now)
+		local now = GetTime() * 1000
+		-- if nameChan then
+		-- 	print(unit, C_Spell.UnitChannelInfo(unit))
+		-- elseif nameCast then
+		-- 	print(unit, C_Spell.UnitCastingInfo(unit))
+		-- end
+		if startTimeMsChan and endTimeMsChan then
+			barValue = startTimeMsChan + (endTimeMsChan - now)
+			nameplate.castBar:SetMinMaxValues(startTimeMsChan, endTimeMsChan)
 			nameplate.castBar:SetValue(barValue)
-			sparkPosition = ((barValue - startTime) / (endTime - startTime)) * nameplate.castBar:GetWidth()
-		else
-			sparkPosition = ((now - startTime) / (endTime - startTime)) * nameplate.castBar:GetWidth()
+			sparkPosition = ((barValue - startTimeMsChan) / (endTimeMsChan - startTimeMsChan)) *  nameplate.castBar:GetWidth()
+		elseif startTimeMsCast and endTimeMsCast then
+			sparkPosition = ((now - startTimeMsCast) / (endTimeMsCast - startTimeMsCast)) * nameplate.castBar:GetWidth()
+			nameplate.castBar:SetMinMaxValues(startTimeMsCast, endTimeMsCast)
 			nameplate.castBar:SetValue(now)
 		end
-		nameplate.castBarSpark:SetPoint("CENTER", nameplate.castBar, "LEFT", sparkPosition, 0)
-		nameplate.castBarIcon:SetTexture(castInfo.icon)
 		nameplate.castBar:Show()
-		nameplate.castBarText:SetText(castInfo.spellName)
+		nameplate.castBarSpark:SetPoint("CENTER", nameplate.castBar, "LEFT", sparkPosition, 0)
+		nameplate.castBarIcon:SetTexture(textureCast or textureChan)
+		nameplate.castBarText:SetText(displayNameCast or displayNameChan)
 		nameplate.clickArea:SetHeight(CLICK_AREA_HEIGHT + nameplate.castBar:GetHeight() + 4)
 	else
 		nameplate.castBar:Hide()
@@ -369,17 +290,18 @@ local function OnUpdate(self)
 	end
 end
 
-local function OnShow(self)
-	local parent = self or this
+local function OnShow(parent)
 	parent:SetHeight(PARENT_HEIGHT)
 	parent:SetWidth(PARENT_WIDTH)
-	parent.unit = parent:GetName(1)
 	OnUpdate(parent.overhead)
 end
 
-local function CreatePlate(parent)
+local function CreatePlate(parent, unit)
+	-- print("Create plate called", parent, unit)
+	if Registry[parent] then return Registry[parent] end
+	numNameplatesCreated  = numNameplatesCreated + 1
+
 	local scale = UIParent:GetEffectiveScale()
-	local guid = parent:GetName(1)
 
 	local nameplate = CreateFrame("Frame", "OverheadPlate"..numNameplatesCreated, parent)
 	nameplate:SetWidth(parent:GetWidth())
@@ -387,6 +309,8 @@ local function CreatePlate(parent)
 	nameplate:SetPoint("CENTER", parent, "CENTER", 0, 12)
 	nameplate:SetFrameLevel(parent:GetFrameLevel()+1)
 	nameplate:SetScale(scale)
+
+	Registry[parent] = nameplate
 
 	nameplate.parent = parent
 	parent.overhead = nameplate
@@ -396,7 +320,7 @@ local function CreatePlate(parent)
 	parent:SetWidth(PARENT_WIDTH)
 	parent:SetScript("OnShow", OnShow)
 	parent:EnableMouse(false)
-	parent.unit = guid
+	parent.unit = unit
 
 	local border, highlight, name, level, levelIcon, raidIcon = parent:GetRegions()
 	parent.border = border
@@ -418,6 +342,7 @@ local function CreatePlate(parent)
 	nameplate.healthBar:SetOrientation("HORIZONTAL")
 	-- nameplate.healthBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 	nameplate.healthBar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-TargetingFrame-BarFill")
+	nameplate.healthBar:GetStatusBarTexture():SetDrawLayer("BORDER")
 	nameplate.healthBar:SetFrameLevel(1)
 	nameplate.healthBar:SetStatusBarColor(parent.healthBar:GetStatusBarColor())
 	nameplate.healthBar:SetMinMaxValues(parent.healthBar:GetMinMaxValues())
@@ -561,25 +486,56 @@ local function CreatePlate(parent)
 	return nameplate
 end
 
-Overhead:SetScript("OnUpdate", function()
-	local numChildren = WorldFrame:GetNumChildren()
-	if numChildrenLastFrame < numChildren then
-		local childs = { WorldFrame:GetChildren() }
-		for i = numChildrenLastFrame + 1, numChildren do
-			local parent = childs[i]
-			if IsNamePlate(parent) and not Registry[parent] then
-				numNameplatesCreated = numNameplatesCreated + 1
-				Registry[parent] = CreatePlate(parent)
-			end
-		end
-		numChildrenLastFrame = numChildren
-	end
+Overhead:SetScript("OnUpdate", function(self, elapsed)
+	-- local numChildren = WorldFrame:GetNumChildren()
+	-- if numChildrenLastFrame < numChildren then
+	-- 	local childs = { WorldFrame:GetChildren() }
+	-- 	for i = numChildrenLastFrame + 1, numChildren do
+	-- 		local parent = childs[i]
+	-- 		if IsNamePlate(parent) then CreatePlate(parent) end
+	-- 	end
+	-- 	numChildrenLastFrame = numChildren
+	-- end
 
 	if Overhead.time and Overhead.frame and not IsMouselooking() and Overhead.time >= GetTime() then
 		Overhead.frame:Click("LeftButton")
 		if UnitCanAttack("player", "target") and not Overhead.isAttacking and (not IsMounted() or CheckInteractDistance("target", 3)) then
 			AttackTarget()
 		end
+		Overhead.frame = nil
+		Overhead.time = nil
+	end
+end)
+
+Overhead:RegisterEvent("PLAYER_ENTER_COMBAT")
+Overhead:RegisterEvent("PLAYER_LEAVE_COMBAT")
+Overhead:RegisterEvent("NAME_PLATE_CREATED")
+Overhead:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+Overhead:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+Overhead.isAttacking = false
+Overhead.frame = nil
+Overhead.time = nil
+
+Overhead:SetScript("OnEvent", function(self, event, arg1)
+	if event == "NAME_PLATE_CREATED" then
+		-- print(event, arg1)
+		CreatePlate(arg1)
+	elseif event == "NAME_PLATE_UNIT_ADDED" then
+		local parent = C_NamePlate.GetNamePlateForUnit(arg1)
+		if parent then
+			local nameplate = Registry[parent]
+			if nameplate then
+				parent.unit = arg1
+				nameplate.clickArea.unit = arg1
+				nameplate.clickArea:SetAttribute("unit", arg1)
+				OnShow(parent)
+				-- print(event, nameplate:GetName(), arg1)
+			end
+		end
+	elseif event == "PLAYER_ENTER_COMBAT" then
+		Overhead.isAttacking = true
+	elseif event == "PLAYER_LEAVE_COMBAT" then
+		Overhead.isAttacking = false
 		Overhead.frame = nil
 		Overhead.time = nil
 	end
