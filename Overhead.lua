@@ -15,32 +15,32 @@ local Registry = {}
 local CastEvents = {}
 
 local Totems = {
-    ["Disease Cleansing Totem"] = "spell_nature_diseasecleansingtotem",
-    ["Earth Elemental Totem"] = "spell_nature_earthelemental_totem",
-    ["Earthbind Totem"] = "spell_nature_strengthofearthtotem02",
-    ["Fire Elemental Totem"] = "spell_fire_elemental_totem",
-    ["Fire Nova Totem"] = "spell_fire_sealoffire",
-    ["Fire Resistance Totem"] = "spell_fireresistancetotem_01",
-    ["Flametongue Totem"] = "spell_nature_guardianward",
-    ["Frost Resistance Totem"] = "spell_frostresistancetotem_01",
-    ["Grace of Air Totem"] = "spell_nature_invisibilitytotem",
-    ["Grounding Totem"] = "spell_nature_groundingtotem",
-    ["Healing Stream Totem"] = "Inv_spear_04",
-    ["Magma Totem"] = "spell_fire_selfdestruct",
-    ["Mana Spring Totem"] = "spell_nature_manaregentotem",
-    ["Mana Tide Totem"] = "spell_frost_summonwaterelemental",
-    ["Nature Resistance Totem"] = "spell_nature_natureresistancetotem",
-    ["Poison Cleansing Totem"] = "spell_nature_poisoncleansingtotem",
-    ["Searing Totem"] = "spell_fire_searingtotem",
-    ["Sentry Totem"] = "spell_nature_removecurse",
-    ["Stoneclaw Totem"] = "spell_nature_stoneclawtotem",
-    ["Stoneskin Totem"] = "spell_nature_stoneskintotem",
-    ["Strength of Earth Totem"] = "spell_nature_earthbindtotem",
-    ["Totem of Wrath"] = "spell_fire_totemofwrath",
-    ["Tremor Totem"] = "spell_nature_tremortotem",
-    ["Windfury Totem"] = "spell_nature_windfury",
-    ["Windwall Totem"] = "spell_nature_earthbind",
-    ["Wrath of Air Totem"] = "spell_nature_slowingtotem",
+    ["Disease Cleansing Totem"] = "Interface\\Icons\\spell_nature_diseasecleansingtotem",
+    ["Earth Elemental Totem"] = "Interface\\Icons\\spell_nature_earthelemental_totem",
+    ["Earthbind Totem"] = "Interface\\Icons\\spell_nature_strengthofearthtotem02",
+    ["Fire Elemental Totem"] = "Interface\\Icons\\spell_fire_elemental_totem",
+    ["Fire Nova Totem"] = "Interface\\Icons\\spell_fire_sealoffire",
+    ["Fire Resistance Totem"] = "Interface\\Icons\\spell_fireresistancetotem_01",
+    ["Flametongue Totem"] = "Interface\\Icons\\spell_nature_guardianward",
+    ["Frost Resistance Totem"] = "Interface\\Icons\\spell_frostresistancetotem_01",
+    ["Grace of Air Totem"] = "Interface\\Icons\\spell_nature_invisibilitytotem",
+    ["Grounding Totem"] = "Interface\\Icons\\spell_nature_groundingtotem",
+    ["Healing Stream Totem"] = "Interface\\Icons\\Inv_spear_04",
+    ["Magma Totem"] = "Interface\\Icons\\spell_fire_selfdestruct",
+    ["Mana Spring Totem"] = "Interface\\Icons\\spell_nature_manaregentotem",
+    ["Mana Tide Totem"] = "Interface\\Icons\\spell_frost_summonwaterelemental",
+    ["Nature Resistance Totem"] = "Interface\\Icons\\spell_nature_natureresistancetotem",
+    ["Poison Cleansing Totem"] = "Interface\\Icons\\spell_nature_poisoncleansingtotem",
+    ["Searing Totem"] = "Interface\\Icons\\spell_fire_searingtotem",
+    ["Sentry Totem"] = "Interface\\Icons\\spell_nature_removecurse",
+    ["Stoneclaw Totem"] = "Interface\\Icons\\spell_nature_stoneclawtotem",
+    ["Stoneskin Totem"] = "Interface\\Icons\\spell_nature_stoneskintotem",
+    ["Strength of Earth Totem"] = "Interface\\Icons\\spell_nature_earthbindtotem",
+    ["Totem of Wrath"] = "Interface\\Icons\\spell_fire_totemofwrath",
+    ["Tremor Totem"] = "Interface\\Icons\\spell_nature_tremortotem",
+    ["Windfury Totem"] = "Interface\\Icons\\spell_nature_windfury",
+    ["Windwall Totem"] = "Interface\\Icons\\spell_nature_earthbind",
+    ["Wrath of Air Totem"] = "Interface\\Icons\\spell_nature_slowingtotem",
 }
 
 local ClassColors = {
@@ -231,14 +231,17 @@ local function OnUpdate(self)
         nameplate.highlight:Hide()
         parent.level:Hide()
         nameplate.name:Hide()
-        local icon = "spell_fire_selfdestruct"
-        for k, v in pairs(Totems) do
-            if string.find(UnitName(unit), k, 1, true) then
-                icon = v
-                break
+        local icon
+        if UnitCreatedBySpell then
+            local id = UnitCreatedBySpell(unit)
+            if id then
+                local _, _, texture = GetSpellInfo(id)
+                icon = texture
             end
+        else
+            icon = Totems[(UnitName(unit))]
         end
-        nameplate.totemIcon:SetTexture("Interface\\Icons\\"..icon)
+        nameplate.totemIcon:SetTexture(icon or "Interface\\Icons\\spell_fire_selfdestruct")
         nameplate.totemIcon:Show()
         nameplate.clickArea:SetWidth(TOTEM_WIDTH)
         nameplate.clickArea:SetHeight(TOTEM_WIDTH)
