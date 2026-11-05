@@ -199,6 +199,7 @@ local function OnUpdate(self)
     local nameplate = self or this
     local parent = nameplate.parent
     local unit = parent:GetName(1)
+    if not unit then return end
     local isTarget = UnitIsUnit("target", unit)
     local isMouseOver = GetMouseFocus() == nameplate.clickArea
     local isTotem, isCritter
@@ -217,7 +218,7 @@ local function OnUpdate(self)
     parent:EnableMouse(false)
     nameplate.name:SetText(parent.name:GetText())
 
-    if isCritter then
+    if isCritter and not UnitIsEnemy(unit, "player") then
         minimized = true
         nameplate.healthBar:Hide()
         nameplate.highlight:Hide()
@@ -312,7 +313,7 @@ local function OnUpdate(self)
         nameplate.healthBar:SetStatusBarColor(0.5, 0.5, 0.5)
     else
         parent.border:SetDesaturated(false)
-        if unit and UnitIsPlayer(unit) then
+        if UnitIsPlayer(unit) then
             local _, class = UnitClass(unit)
             local color = ClassColors[class]
             nameplate.healthBar:SetStatusBarColor(color.r, color.g, color.b)
